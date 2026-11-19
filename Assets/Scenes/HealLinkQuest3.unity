@@ -918,8 +918,8 @@ Camera:
   m_GameObject: {fileID: 593611878}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0.019607844}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0.019607844}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -2081,7 +2081,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1017281514}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c545d0b8677f68c44bc66f7af594c623, type: 3}
   m_Name: 
@@ -2120,7 +2120,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1017281514}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: db5f6c3a6aa747c99b2a9fd3248e8a11, type: 3}
   m_Name: 
@@ -2489,6 +2489,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1353534663
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1353534665}
+  - component: {fileID: 1353534664}
+  m_Layer: 0
+  m_Name: PassthroughReciever
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1353534664
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1353534663}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fff53b2782ec96458be5bd4c37b2362, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PassthroughFrameReceiver
+  listenPort: 5057
+  targetRenderer: {fileID: 19550153}
+  flipVertical: 0
+  logStatus: 1
+  stereo: 0
+  stereoMaterial: {fileID: 2100000, guid: 99a3831290fa28d46b1c81c7ca679f43, type: 2}
+--- !u!4 &1353534665
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1353534663}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0, y: -0, z: -0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1375583287
 GameObject:
   m_ObjectHideFlags: 0
@@ -2652,6 +2702,7 @@ GameObject:
   - component: {fileID: 1497759129}
   - component: {fileID: 1497759130}
   - component: {fileID: 1497759131}
+  - component: {fileID: 1497759132}
   m_Layer: 0
   m_Name: Quad_PV_Depth
   m_TagString: Untagged
@@ -2747,8 +2798,8 @@ Transform:
   m_GameObject: {fileID: 1497759122}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.0001}
-  m_LocalScale: {x: 12.8, y: 7.2, z: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 110646733}
@@ -2764,7 +2815,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1497759122}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0aba6a287852dc4bb2885a02a11f03c, type: 3}
   m_Name: 
@@ -2773,9 +2824,9 @@ MonoBehaviour:
   distance: 1
   minDistance: 0.3
   maxDistance: 1.5
-  useDepthSource: 1
+  useDepthSource: 0
   depthSource: {fileID: 1497759130}
-  defaultDistance: 1
+  defaultDistance: 1.5
   holdLastDistanceWhenDepthMissing: 1
   depthDeadband: 0.01
   depthInputScale: 1
@@ -2803,6 +2854,9 @@ MonoBehaviour:
   depthQuadName: rm_depth_ahat_z
   quadLayerGapMeters: 0.001
   scaleDepthAxisWithDistance: 0
+  sensorRes: {x: 1728, y: 1728}
+  focal: {x: 1173.17, y: 1173.17}
+  sentRes: {x: 1280, y: 960}
 --- !u!114 &1497759129
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2874,6 +2928,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5b8469df83346744a28635ba60e0888, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WallBiasMap
+--- !u!114 &1497759132
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1497759122}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29f37799da817f4d918aa235c20fb76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RemoteView
+  head: {fileID: 593611879}
+  receiver: {fileID: 1353534664}
+  distance: 10
+  sensorRes: {x: 1728, y: 1728}
+  focal: {x: 1173.17, y: 1173.17}
+  sentRes: {x: 1280, y: 1280}
+  worldLocked: 0
+  fillScale: 1
+  pitchDownDegrees: 3
 --- !u!1 &1559195191
 GameObject:
   m_ObjectHideFlags: 0
@@ -3767,7 +3842,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   usePerEyeCameras: 0
-  useFixedUpdateForTracking: 0
+  useFixedUpdateForTracking: 1
   disableEyeAnchorCameras: 0
 --- !u!114 &2053258791
 MonoBehaviour:
@@ -3961,8 +4036,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sendOnEnable: 1
-  useRunOnceHost: 1
-  targetHost: 192.168.137.31
+  useRunOnceHost: 0
+  targetHost: 192.168.235.31
   useLocalhostInEditor: 0
   editorTargetHost: 127.0.0.1
   targetPort: 5055
@@ -3996,7 +4071,7 @@ MonoBehaviour:
   enableLeftPinchStroke: 1
   useMetaHandTrackingBlockPinch: 1
   strokePointOverride: {fileID: 0}
-  projectStrokeOntoDepth: 1
+  projectStrokeOntoDepth: 0
   applyBillboardCalibrationToStroke: 1
   depthProjectionSource: {fileID: 1497759130}
   autoFindDepthProjectionSource: 1
@@ -4017,7 +4092,7 @@ MonoBehaviour:
   showLeftHandAtDepthWhilePinching: 1
   pinchDepthHandSmoothingTime: 0.04
   pinchDepthHandMaximumSpeed: 1.5
-  sendQuestMicrophoneAudio: 0
+  sendQuestMicrophoneAudio: 1
   microphoneDeviceName: 
   audioSampleRate: 16000
   audioPacketRateHz: 90
@@ -4027,18 +4102,18 @@ MonoBehaviour:
   downmixAudioToMono: 1
   maximumAudioPacketDurationSeconds: 0.016
   maximumAudioPacketsPerUpdate: 6
-  logAudioStatus: 0
-  saveAudioDiagnosticsToFile: 0
+  logAudioStatus: 1
+  saveAudioDiagnosticsToFile: 1
   audioDiagnosticsFolderName: AudioDiagnostics
   microphoneStartDelaySeconds: 1
-  saveOutgoingAudioWav: 0
+  saveOutgoingAudioWav: 1
   audioWavFolderName: AudioWavCaptures
   outgoingAudioWavSubfolderName: Sender
   outgoingAudioWavFileName: quest_sender_outgoing.wav
   timestampAudioWavFiles: 1
   audioLimiterCeiling: 0.9
   logConnectionChanges: 1
-  logPackets: 0
+  logPackets: 1
   warnAboutLinkLocalTarget: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
@@ -4052,3 +4127,4 @@ SceneRoots:
   - {fileID: 1149222898}
   - {fileID: 714490345}
   - {fileID: 2123456701}
+  - {fileID: 1353534665}

@@ -137,6 +137,19 @@ public sealed class WebRtcAudioPeer : MonoBehaviour
 
     private IEnumerator StartPeerAfterDelay()
     {
+        #if UNITY_ANDROID && !UNITY_EDITOR
+            if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.Microphone))
+            {
+                UnityEngine.Android.Permission.RequestUserPermission(UnityEngine.Android.Permission.Microphone);
+                float waited = 0f;
+                while (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.Microphone) && waited < 30f)
+                {
+                    waited += Time.unscaledDeltaTime;
+                    yield return null;
+                }
+            }
+        #endif
+
         float delay = Mathf.Max(0f, startupDelaySeconds);
         if (delay > 0f)
         {

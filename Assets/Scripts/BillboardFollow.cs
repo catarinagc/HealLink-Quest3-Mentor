@@ -126,6 +126,20 @@ public class BillboardFollow : MonoBehaviour
     private GameObject calibrationCenterMarker;
     private Material calibrationCenterMarkerMaterial;
 
+    [Header("Camera intrinsics (from sender)")]
+    public Vector2 sensorRes = new Vector2(1728, 1728);
+    public Vector2 focal = new Vector2(1173.17f, 1173.17f);
+    public Vector2 sentRes = new Vector2(1280, 960); // resolution of the camera image, not the 640x480 JPEG
+
+    public void ApplyIntrinsicsScale()
+    {
+        float s = sentRes.x / sensorRes.x;            // uniform scale, vertical is cropped
+        float fx = focal.x * s, fy = focal.y * s;
+        float w = baseDistance * sentRes.x / fx;
+        float h = baseDistance * sentRes.y / fy;
+        baseScale = new Vector3(w, h, baseScale.z);
+    }
+
     void Start()
     {
         EnsureDistanceOrder();
@@ -135,6 +149,8 @@ public class BillboardFollow : MonoBehaviour
         baseScale = transform.localScale;
         if (baseDistance <= 0f)
             baseDistance = 8f;
+
+        ApplyIntrinsicsScale();
 
         originalDistance = Mathf.Max(0.01f, distance);
         smoothedDistance = distance;
