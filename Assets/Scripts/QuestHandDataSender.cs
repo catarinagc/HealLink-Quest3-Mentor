@@ -154,10 +154,26 @@ public sealed class QuestHandDataSender : MonoBehaviour
     [Tooltip("Ceiling used by the soft limiter after audioGain. Lower values reduce distortion and clipping.")]
     public float audioLimiterCeiling = 0.9f;
 
+    [Header("Stroke via remote view")]
+    public bool projectStrokeOntoRemoteView = true;
+    public RemoteView remoteView;                 // the billboard showing the trainee's passthrough
+    [Tooltip("Set to match PassthroughFrameReceiver.flipVertical on the mentor.")]
+    public bool remoteViewFlipVertical = false;
+    public bool rejectOutsideRemoteView = true;
+
+    [Header("Preview width")]
+    [Tooltip("Scale the Quest-local preview width with distance so it looks as thick as the stroke on the trainee side.")]
+    public bool scalePreviewWidthWithDistance = true;
+    [Tooltip("Typical distance (m) at which strokes appear on the trainee side. Preview width = strokeLineWidth at this distance.")]
+    public float previewReferenceDistance = 1.5f;
+
+    private Vector3 lastRayDirection = Vector3.forward;
+
     [Header("Debug")]
     public bool logConnectionChanges = true;
     public bool logPackets = false;
     public bool warnAboutLinkLocalTarget = true;
+
 
     private readonly HandFramePacket packet = new HandFramePacket();
     private readonly List<HandFrame> frameBuffer = new List<HandFrame>(2);
@@ -576,6 +592,20 @@ public sealed class QuestHandDataSender : MonoBehaviour
         frameBuffer.Add(frame);
     }
 
+    private float GetPreviewWidth()
+    {
+        if (!scalePreviewWidthWithDistance || currentQuestStrokePoints.Count == 0)
+            return strokeLineWidth;
+
+        Transform cam = referenceCamera;
+        if (cam == null && Camera.main != null) cam = Camera.main.transform;
+        if (cam == null) return strokeLineWidth;
+
+        Vector3 last = currentQuestStrokePoints[currentQuestStrokePoints.Count - 1];
+        float d = Vector3.Distance(cam.position, last);
+        return strokeLineWidth * Mathf.Max(1f, d / Mathf.Max(0.1f, previewReferenceDistance));
+    }
+
     private void UpdateLeftPinchStroke()
     {
         if (!enableLeftPinchStroke || !IsLeftPinchActive())
@@ -678,159 +708,220 @@ public sealed class QuestHandDataSender : MonoBehaviour
         return false;
     }
 
+    //private bool TryResolveStrokePoint(Vector3 sourcePoint, out Vector3 worldPoint)
+    //{
+    //    if (projectStrokeOntoDepth)
+    //    {
+    //        if (TryProjectStrokePointOntoDepth(sourcePoint, out worldPoint))
+    //        {
+    //            hasLastDepthProjectedStrokePoint = true;
+    //            lastDepthProjectedStrokePoint = worldPoint;
+    //            return true;
+    //        }
+
+    //        if (skipStrokePointsWithoutDepth)
+    //        {
+    //            currentStrokePointSkippedForDepth = true;
+    //            worldPoint = Vector3.zero;
+    //            return false;
+    //        }
+
+    //        if (leftPinchWasActive && hasLastDepthProjectedStrokePoint)
+    //        {
+    //            worldPoint = lastDepthProjectedStrokePoint;
+    //            return IsFinite(worldPoint);
+    //        }
+    //    }
+
+    //    worldPoint = sourcePoint;
+    //    return IsFinite(worldPoint);
+    //}
+
     private bool TryResolveStrokePoint(Vector3 sourcePoint, out Vector3 worldPoint)
     {
-        if (projectStrokeOntoDepth)
+        if (projectStrokeOntoRemoteView)
         {
-            if (TryProjectStrokePointOntoDepth(sourcePoint, out worldPoint))
-            {
-                hasLastDepthProjectedStrokePoint = true;
-                lastDepthProjectedStrokePoint = worldPoint;
+            if (TryProjectOntoRemoteView(sourcePoint, out worldPoint, out lastRayDirection))
                 return true;
-            }
 
-            if (skipStrokePointsWithoutDepth)
-            {
-                currentStrokePointSkippedForDepth = true;
-                worldPoint = Vector3.zero;
-                return false;
-            }
-
-            if (leftPinchWasActive && hasLastDepthProjectedStrokePoint)
-            {
-                worldPoint = lastDepthProjectedStrokePoint;
-                return IsFinite(worldPoint);
-            }
+            currentStrokePointSkippedForDepth = true;   // suppresses the "missing point" warning
+            worldPoint = Vector3.zero;
+            return false;
         }
 
         worldPoint = sourcePoint;
         return IsFinite(worldPoint);
     }
 
-    private bool TryProjectStrokePointOntoDepth(Vector3 sourcePoint, out Vector3 depthPoint)
+    private bool TryProjectOntoRemoteView(Vector3 sourcePoint, out Vector3 billboardPoint, out Vector3 cameraDir)
     {
-        depthPoint = Vector3.zero;
+        billboardPoint = Vector3.zero;
+        cameraDir = Vector3.forward;
 
-        if (depthProjectionSource == null && autoFindDepthProjectionSource)
-        {
-            if (Time.unscaledTime >= nextDepthProjectionFindTime)
-            {
-                nextDepthProjectionFindTime = Time.unscaledTime + 1f;
-                FindDepthProjectionSource();
-            }
-        }
+        if (remoteView == null) remoteView = FindObjectOfType<RemoteView>();
+        if (remoteView == null) return false;
 
-        if (depthProjectionSource == null)
-        {
-            WarnAboutMissingDepthProjectionSource();
-            return false;
-        }
+        if (referenceCamera == null && autoFindReferenceCamera) FindReferenceCamera();
+        if (referenceCamera == null) return false;
 
-        Transform projectionCamera = depthProjectionCamera != null ? depthProjectionCamera : referenceCamera;
-        if (projectionCamera == null && autoFindReferenceCamera)
-        {
-            FindReferenceCamera();
-            projectionCamera = referenceCamera;
-        }
+        Transform quad = remoteView.transform;
+        Vector3 origin = referenceCamera.position;
+        Vector3 dir = sourcePoint - origin;
+        if (dir.sqrMagnitude < 1e-6f) return false;
+        dir.Normalize();
 
-        if (projectionCamera == null)
-        {
-            WarnAboutMissingDepthProjectionSource();
-            return false;
-        }
+        // Hand ray (head -> pinch point) vs billboard plane
+        Plane plane = new Plane(quad.forward, quad.position);
+        Ray ray = new Ray(origin, dir);
+        if (!plane.Raycast(ray, out float enter) || enter <= 0f) return false;
+        billboardPoint = ray.GetPoint(enter);
 
-        float depthMeters;
-        float rawValue;
-        Vector2 billboardUV;
-        if (!depthProjectionSource.TryProjectWorldPointToDepth(
-                sourcePoint,
-                projectionCamera,
-                out depthPoint,
-                out depthMeters,
-                out rawValue,
-                out billboardUV))
-        {
-            return false;
-        }
+        // Unity Quad spans -0.5..0.5 in local x/y
+        Vector3 local = quad.InverseTransformPoint(billboardPoint);
+        float u = local.x + 0.5f;
+        float v = local.y + 0.5f;
+        if (rejectOutsideRemoteView && (u < 0f || u > 1f || v < 0f || v > 1f)) return false;
+        u = Mathf.Clamp01(u);
+        v = Mathf.Clamp01(v);
+        if (remoteViewFlipVertical) v = 1f - v;
 
-        if (applyBillboardCalibrationToStroke)
-        {
-            Vector2 centeredBillboardCoordinates = new Vector2(
-                Mathf.Clamp(billboardUV.x * 2f - 1f, -1f, 1f),
-                Mathf.Clamp(billboardUV.y * 2f - 1f, -1f, 1f));
-            depthPoint += GetDepthScaledBillboardCorrection(
-                projectionCamera,
-                centeredBillboardCoordinates,
-                depthMeters);
-        }
+        // uv -> ray in the trainee's passthrough camera frame (pinhole model)
+        Vector2 sentRes = remoteView.sentRes;
+        Vector2 sensorRes = remoteView.sensorRes;
+        float fx = remoteView.focal.x * (sentRes.x / sensorRes.x);
+        float fy = remoteView.focal.y * (sentRes.y / sensorRes.y);
+        cameraDir = new Vector3(
+            (u - 0.5f) * sentRes.x / fx,
+            (v - 0.5f) * sentRes.y / fy,
+            1f).normalized;
 
-        if (!IsFinite(depthPoint))
-        {
-            return false;
-        }
-
-        if (!IsProjectedStrokePointSafe(depthPoint, projectionCamera, out float forwardDistance))
-        {
-            return false;
-        }
-
-        hasLastDepthProjectedForwardDistance = true;
-        lastDepthProjectedForwardDistance = forwardDistance;
-        warnedAboutMissingDepthProjectionSource = false;
-        return true;
+        return IsFinite(billboardPoint) && IsFinite(cameraDir);
     }
 
-    private bool IsProjectedStrokePointSafe(Vector3 depthPoint, Transform projectionCamera, out float forwardDistance)
-    {
-        forwardDistance = 0f;
+    //private bool TryProjectStrokePointOntoDepth(Vector3 sourcePoint, out Vector3 depthPoint)
+    //{
+    //    depthPoint = Vector3.zero;
 
-        if (projectionCamera == null || !IsFinite(depthPoint))
-        {
-            return false;
-        }
+    //    if (depthProjectionSource == null && autoFindDepthProjectionSource)
+    //    {
+    //        if (Time.unscaledTime >= nextDepthProjectionFindTime)
+    //        {
+    //            nextDepthProjectionFindTime = Time.unscaledTime + 1f;
+    //            FindDepthProjectionSource();
+    //        }
+    //    }
 
-        Vector3 cameraToPoint = depthPoint - projectionCamera.position;
-        if (cameraToPoint.sqrMagnitude < 1e-8f)
-        {
-            return false;
-        }
+    //    if (depthProjectionSource == null)
+    //    {
+    //        WarnAboutMissingDepthProjectionSource();
+    //        return false;
+    //    }
 
-        Vector3 cameraForward = projectionCamera.forward;
-        if (cameraForward.sqrMagnitude < 1e-8f)
-        {
-            return false;
-        }
+    //    Transform projectionCamera = depthProjectionCamera != null ? depthProjectionCamera : referenceCamera;
+    //    if (projectionCamera == null && autoFindReferenceCamera)
+    //    {
+    //        FindReferenceCamera();
+    //        projectionCamera = referenceCamera;
+    //    }
 
-        forwardDistance = Vector3.Dot(cameraToPoint, cameraForward.normalized);
-        if (!IsFinite(forwardDistance))
-        {
-            return false;
-        }
+    //    if (projectionCamera == null)
+    //    {
+    //        WarnAboutMissingDepthProjectionSource();
+    //        return false;
+    //    }
 
-        if (rejectStrokePointsNearCamera && forwardDistance < minimumStrokeDistanceFromCamera)
-        {
-            currentStrokePointSkippedForDepth = true;
-            return false;
-        }
+    //    float depthMeters;
+    //    float rawValue;
+    //    Vector2 billboardUV;
+    //    if (!depthProjectionSource.TryProjectWorldPointToDepth(
+    //            sourcePoint,
+    //            projectionCamera,
+    //            out depthPoint,
+    //            out depthMeters,
+    //            out rawValue,
+    //            out billboardUV))
+    //    {
+    //        return false;
+    //    }
 
-        if (maximumStrokeHeadwardJump > 0f &&
-            hasLastDepthProjectedForwardDistance &&
-            forwardDistance < lastDepthProjectedForwardDistance - maximumStrokeHeadwardJump)
-        {
-            currentStrokePointSkippedForDepth = true;
-            return false;
-        }
+    //    if (applyBillboardCalibrationToStroke)
+    //    {
+    //        Vector2 centeredBillboardCoordinates = new Vector2(
+    //            Mathf.Clamp(billboardUV.x * 2f - 1f, -1f, 1f),
+    //            Mathf.Clamp(billboardUV.y * 2f - 1f, -1f, 1f));
+    //        depthPoint += GetDepthScaledBillboardCorrection(
+    //            projectionCamera,
+    //            centeredBillboardCoordinates,
+    //            depthMeters);
+    //    }
 
-        if (maximumStrokePointJump > 0f &&
-            hasLastDepthProjectedStrokePoint &&
-            Vector3.Distance(lastDepthProjectedStrokePoint, depthPoint) > maximumStrokePointJump)
-        {
-            currentStrokePointSkippedForDepth = true;
-            return false;
-        }
+    //    if (!IsFinite(depthPoint))
+    //    {
+    //        return false;
+    //    }
 
-        return true;
-    }
+    //    if (!IsProjectedStrokePointSafe(depthPoint, projectionCamera, out float forwardDistance))
+    //    {
+    //        return false;
+    //    }
+
+    //    hasLastDepthProjectedForwardDistance = true;
+    //    lastDepthProjectedForwardDistance = forwardDistance;
+    //    warnedAboutMissingDepthProjectionSource = false;
+    //    return true;
+    //}
+
+    //private bool IsProjectedStrokePointSafe(Vector3 depthPoint, Transform projectionCamera, out float forwardDistance)
+    //{
+    //    forwardDistance = 0f;
+
+    //    if (projectionCamera == null || !IsFinite(depthPoint))
+    //    {
+    //        return false;
+    //    }
+
+    //    Vector3 cameraToPoint = depthPoint - projectionCamera.position;
+    //    if (cameraToPoint.sqrMagnitude < 1e-8f)
+    //    {
+    //        return false;
+    //    }
+
+    //    Vector3 cameraForward = projectionCamera.forward;
+    //    if (cameraForward.sqrMagnitude < 1e-8f)
+    //    {
+    //        return false;
+    //    }
+
+    //    forwardDistance = Vector3.Dot(cameraToPoint, cameraForward.normalized);
+    //    if (!IsFinite(forwardDistance))
+    //    {
+    //        return false;
+    //    }
+
+    //    if (rejectStrokePointsNearCamera && forwardDistance < minimumStrokeDistanceFromCamera)
+    //    {
+    //        currentStrokePointSkippedForDepth = true;
+    //        return false;
+    //    }
+
+    //    if (maximumStrokeHeadwardJump > 0f &&
+    //        hasLastDepthProjectedForwardDistance &&
+    //        forwardDistance < lastDepthProjectedForwardDistance - maximumStrokeHeadwardJump)
+    //    {
+    //        currentStrokePointSkippedForDepth = true;
+    //        return false;
+    //    }
+
+    //    if (maximumStrokePointJump > 0f &&
+    //        hasLastDepthProjectedStrokePoint &&
+    //        Vector3.Distance(lastDepthProjectedStrokePoint, depthPoint) > maximumStrokePointJump)
+    //    {
+    //        currentStrokePointSkippedForDepth = true;
+    //        return false;
+    //    }
+
+    //    return true;
+    //}
 
     private void WarnAboutMissingLeftPinchSource()
     {
@@ -943,66 +1034,69 @@ public sealed class QuestHandDataSender : MonoBehaviour
         strokeEvent.width = strokeLineWidth;
         strokeEvent.color = strokeColor;
         strokeEvent.timestamp = Time.unscaledTime;
+        strokeEvent.hasRay = projectStrokeOntoRemoteView;
+        strokeEvent.rayDirection = lastRayDirection;
         strokeEventQueue.Add(strokeEvent);
     }
 
     private Vector3 GetRightHandBillboardOffset(OVRSkeleton skeleton)
     {
-        if (!alignStreamedRightHandToBillboardMarker ||
-            skeleton == null ||
-            !TryGetBoneWorldPosition(skeleton, billboardAnchorTipId, out Vector3 fingertipWorldPosition) ||
-            !TryGetBillboardMarker(out Vector3 markerWorldPosition, out Vector2 centeredBillboardCoordinates))
-        {
-            return hasSmoothedRightHandOffset ? smoothedRightHandOffset : Vector3.zero;
-        }
+        //if (!alignStreamedRightHandToBillboardMarker ||
+        //    skeleton == null ||
+        //    !TryGetBoneWorldPosition(skeleton, billboardAnchorTipId, out Vector3 fingertipWorldPosition) ||
+        //    !TryGetBillboardMarker(out Vector3 markerWorldPosition, out Vector2 centeredBillboardCoordinates))
+        //{
+        //    return hasSmoothedRightHandOffset ? smoothedRightHandOffset : Vector3.zero;
+        //}
 
-        Transform cameraTransform = referenceCamera != null ? referenceCamera : depthProjectionCamera;
-        if (cameraTransform == null)
-        {
-            return Vector3.zero;
-        }
+        //Transform cameraTransform = referenceCamera != null ? referenceCamera : depthProjectionCamera;
+        //if (cameraTransform == null)
+        //{
+        //    return Vector3.zero;
+        //}
 
-        Vector3 cameraToMarker = markerWorldPosition - cameraTransform.position;
-        float markerDepth = cameraToMarker.magnitude;
-        if (markerDepth <= 0.001f || !IsFinite(markerDepth))
-        {
-            return hasSmoothedRightHandOffset ? smoothedRightHandOffset : Vector3.zero;
-        }
+        //Vector3 cameraToMarker = markerWorldPosition - cameraTransform.position;
+        //float markerDepth = cameraToMarker.magnitude;
+        //if (markerDepth <= 0.001f || !IsFinite(markerDepth))
+        //{
+        //    return hasSmoothedRightHandOffset ? smoothedRightHandOffset : Vector3.zero;
+        //}
 
-        const float minimumDepth = 0.2f;
-        const float maximumDepth = 1.5f;
-        const float smoothingTime = 0.04f;
-        const float maximumOffsetSpeed = 1.5f;
+        //const float minimumDepth = 0.2f;
+        //const float maximumDepth = 1.5f;
+        //const float smoothingTime = 0.04f;
+        //const float maximumOffsetSpeed = 1.5f;
 
-        float sharedDepth = Mathf.Clamp(markerDepth, minimumDepth, maximumDepth);
+        //float sharedDepth = Mathf.Clamp(markerDepth, minimumDepth, maximumDepth);
 
-        Vector3 targetWorldPosition = cameraTransform.position + cameraToMarker.normalized * sharedDepth;
-        targetWorldPosition += GetDepthScaledBillboardCorrection(
-            cameraTransform,
-            centeredBillboardCoordinates,
-            sharedDepth);
-        Vector3 targetOffset = targetWorldPosition - fingertipWorldPosition;
-        if (!IsFinite(targetOffset))
-        {
-            return hasSmoothedRightHandOffset ? smoothedRightHandOffset : Vector3.zero;
-        }
+        //Vector3 targetWorldPosition = cameraTransform.position + cameraToMarker.normalized * sharedDepth;
+        //targetWorldPosition += GetDepthScaledBillboardCorrection(
+        //    cameraTransform,
+        //    centeredBillboardCoordinates,
+        //    sharedDepth);
+        //Vector3 targetOffset = targetWorldPosition - fingertipWorldPosition;
+        //if (!IsFinite(targetOffset))
+        //{
+        //    return hasSmoothedRightHandOffset ? smoothedRightHandOffset : Vector3.zero;
+        //}
 
-        if (!hasSmoothedRightHandOffset)
-        {
-            hasSmoothedRightHandOffset = true;
-            smoothedRightHandOffset = Vector3.zero;
-            rightHandOffsetVelocity = Vector3.zero;
-        }
+        //if (!hasSmoothedRightHandOffset)
+        //{
+        //    hasSmoothedRightHandOffset = true;
+        //    smoothedRightHandOffset = Vector3.zero;
+        //    rightHandOffsetVelocity = Vector3.zero;
+        //}
 
-        smoothedRightHandOffset = Vector3.SmoothDamp(
-            smoothedRightHandOffset,
-            targetOffset,
-            ref rightHandOffsetVelocity,
-            smoothingTime,
-            maximumOffsetSpeed,
-            Mathf.Max(0.0001f, Time.unscaledDeltaTime));
+        //smoothedRightHandOffset = Vector3.SmoothDamp(
+        //    smoothedRightHandOffset,
+        //    targetOffset,
+        //    ref rightHandOffsetVelocity,
+        //    smoothingTime,
+        //    maximumOffsetSpeed,
+        //    Mathf.Max(0.0001f, Time.unscaledDeltaTime));
 
-        return smoothedRightHandOffset;
+        //return smoothedRightHandOffset;
+        return Vector3.zero;
     }
 
     private bool TryGetBillboardMarker(
@@ -1420,8 +1514,11 @@ public sealed class QuestHandDataSender : MonoBehaviour
             return;
         }
 
-        activeQuestStrokeLine.startWidth = strokeLineWidth;
-        activeQuestStrokeLine.endWidth = strokeLineWidth;
+        //activeQuestStrokeLine.startWidth = strokeLineWidth;
+        //activeQuestStrokeLine.endWidth = strokeLineWidth;
+        float previewWidth = GetPreviewWidth();
+        activeQuestStrokeLine.startWidth = previewWidth;
+        activeQuestStrokeLine.endWidth = previewWidth;
         activeQuestStrokeLine.startColor = strokeColor;
         activeQuestStrokeLine.endColor = strokeColor;
 
@@ -1430,7 +1527,8 @@ public sealed class QuestHandDataSender : MonoBehaviour
             Vector3 firstPoint = GetQuestStrokePreviewPoint(currentQuestStrokePoints[0]);
             activeQuestStrokeLine.positionCount = 2;
             activeQuestStrokeLine.SetPosition(0, firstPoint);
-            activeQuestStrokeLine.SetPosition(1, firstPoint + GetPreviewFallbackDirection() * previewMinimumVisibleLength);
+            //activeQuestStrokeLine.SetPosition(1, firstPoint + GetPreviewFallbackDirection() * previewMinimumVisibleLength);
+            activeQuestStrokeLine.SetPosition(1, firstPoint + GetPreviewFallbackDirection() * previewMinimumVisibleLength * (previewWidth / strokeLineWidth));
             return;
         }
 
@@ -2740,6 +2838,8 @@ public sealed class QuestHandDataSender : MonoBehaviour
         public float width;
         public Color color;
         public float timestamp;
+        public bool hasRay;
+        public Vector3 rayDirection;
     }
 
     [Serializable]

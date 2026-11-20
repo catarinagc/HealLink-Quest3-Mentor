@@ -250,7 +250,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &110646733
 Transform:
   m_ObjectHideFlags: 0
@@ -2522,7 +2522,7 @@ MonoBehaviour:
   targetRenderer: {fileID: 19550153}
   flipVertical: 0
   logStatus: 1
-  stereo: 0
+  stereo: 1
   stereoMaterial: {fileID: 2100000, guid: 99a3831290fa28d46b1c81c7ca679f43, type: 2}
 --- !u!4 &1353534665
 Transform:
@@ -2864,7 +2864,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1497759122}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5164282f010a92846a0cc06471250517, type: 3}
   m_Name: 
@@ -2893,7 +2893,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1497759122}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e2475cf4cf0bd164190b6aa2a1bbec42, type: 3}
   m_Name: 
@@ -4089,7 +4089,7 @@ MonoBehaviour:
   showQuestStrokePreview: 1
   keepQuestStrokePreviewVisible: 1
   questStrokePreviewCameraOffset: 0.04
-  showLeftHandAtDepthWhilePinching: 1
+  showLeftHandAtDepthWhilePinching: 0
   pinchDepthHandSmoothingTime: 0.04
   pinchDepthHandMaximumSpeed: 1.5
   sendQuestMicrophoneAudio: 1
@@ -4112,6 +4112,12 @@ MonoBehaviour:
   outgoingAudioWavFileName: quest_sender_outgoing.wav
   timestampAudioWavFiles: 1
   audioLimiterCeiling: 0.9
+  projectStrokeOntoRemoteView: 1
+  remoteView: {fileID: 1497759132}
+  remoteViewFlipVertical: 0
+  rejectOutsideRemoteView: 1
+  scalePreviewWidthWithDistance: 1
+  previewReferenceDistance: 1.5
   logConnectionChanges: 1
   logPackets: 1
   warnAboutLinkLocalTarget: 1

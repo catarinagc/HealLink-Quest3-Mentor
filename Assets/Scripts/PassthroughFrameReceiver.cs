@@ -34,6 +34,17 @@ public sealed class PassthroughFrameReceiver : MonoBehaviour
     public bool stereo = true;
     public Material stereoMaterial;
 
+    //private Texture2D scratch;
+    //private Material activeMaterial;
+    //private int decodeFailures;
+    //private Texture2D NewTex()
+    //{
+    //    var t = new Texture2D(2, 2, TextureFormat.RGB24, false);
+    //    t.wrapMode = TextureWrapMode.Clamp;
+    //    t.filterMode = FilterMode.Bilinear;
+    //    return t;
+    //}
+
     private void OnEnable()
     {
         try
@@ -79,15 +90,6 @@ public sealed class PassthroughFrameReceiver : MonoBehaviour
 
         if (!texture.LoadImage(jpg, false)) return;
 
-        //if (!materialConfigured)
-        //{
-        //    Material m = targetRenderer.material;
-        //    m.mainTexture = texture;
-        //    m.mainTextureScale = new Vector2(1f, flipVertical ? -1f : 1f);
-        //    m.mainTextureOffset = new Vector2(0f, flipVertical ? 1f : 0f);
-        //    materialConfigured = true;
-        //}
-
         if (!materialConfigured)
         {
             if (stereo && stereoMaterial != null)
@@ -114,6 +116,58 @@ public sealed class PassthroughFrameReceiver : MonoBehaviour
             Debug.Log("PassthroughFrameReceiver shown frames=" + framesShown + ", size=" + texture.width + "x" + texture.height);
         }
     }
+
+    //private void Update()
+    //{
+    //    byte[] jpg = null;
+    //    lock (frameLock) { jpg = latestJpeg; latestJpeg = null; }
+    //    if (jpg == null || targetRenderer == null) return;
+
+    //    // reject obviously broken JPEGs (must start FFD8 and end FFD9)
+    //    if (jpg.Length < 4 || jpg[0] != 0xFF || jpg[1] != 0xD8 ||
+    //        jpg[jpg.Length - 2] != 0xFF || jpg[jpg.Length - 1] != 0xD9)
+    //    {
+    //        decodeFailures++;
+    //        return;
+    //    }
+
+    //    if (texture == null) texture = NewTex();
+    //    if (scratch == null) scratch = NewTex();
+
+    //    // decode off-screen, only swap on success
+    //    if (!scratch.LoadImage(jpg, false) || scratch.width < 16 || scratch.height < 16)
+    //    {
+    //        decodeFailures++;
+    //        return;
+    //    }
+    //    Texture2D tmp = texture; texture = scratch; scratch = tmp;
+
+    //    if (!materialConfigured)
+    //    {
+    //        if (stereo && stereoMaterial != null)
+    //        {
+    //            activeMaterial = new Material(stereoMaterial);
+    //            targetRenderer.material = activeMaterial;
+    //            activeMaterial.SetFloat("_FlipY", flipVertical ? 1f : 0f);
+    //        }
+    //        else
+    //        {
+    //            activeMaterial = targetRenderer.material;
+    //            activeMaterial.mainTextureScale = new Vector2(1f, flipVertical ? -1f : 1f);
+    //            activeMaterial.mainTextureOffset = new Vector2(0f, flipVertical ? 1f : 0f);
+    //        }
+    //        materialConfigured = true;
+    //    }
+    //    activeMaterial.mainTexture = texture;
+
+    //    framesShown++;
+    //    if (logStatus && Time.unscaledTime >= nextLogTime)
+    //    {
+    //        nextLogTime = Time.unscaledTime + 3f;
+    //        Debug.Log("PassthroughFrameReceiver shown=" + framesShown + ", failed=" + decodeFailures +
+    //                  ", size=" + texture.width + "x" + texture.height);
+    //    }
+    //}
 
     private void ReceiveLoop()
     {
